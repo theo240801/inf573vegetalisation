@@ -11,12 +11,12 @@ Projet d'INF573 sur la détection et la classification de la végétalisation de
 
 
 ## Feuille de route
--combiner les images sattelites 
--trouver les composantes connexes des villes
--une fois qu'on a la composante connexe, trouver un indice représentant la couverture végétale
+- combiner les images sattelites 
+- trouver les composantes connexes des villes
+- une fois qu'on a la composante connexe, trouver un indice représentant la couverture végétale
 
 après:
--corréler cet indice à d'autres paramètres
-?? patterns detection 
-?? compter le nombre d'arbres 
-??classifier les différents types de végétations (utiliser le CNN fourni)
+- corréler cet indice à d'autres paramètres
+- ?? patterns detection 
+ -?? compter le nombre d'arbres 
+- ??classifier les différents types de végétations (utiliser le CNN fourni)
