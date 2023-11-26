@@ -1,17 +1,17 @@
 #### DATA PATHS
 data:
 
-  path_aerial_train: "./dataflair/flair_1_toy_aerial_train"  #e.g.,  ./flair_aerial_train/ or flair_1_toy_aerial_train/
-  path_aerial_test:  "./dataflair/flair_1_toy_aerial_test"  #e.g., ./flair_1_aerial_test/ or flair_1_toy_aerial_test/
+  path_aerial_train: "./dataflair/flair_1_toy_aerial_train/"  #e.g.,  ./flair_aerial_train/ or flair_1_toy_aerial_train/
+  path_aerial_test:  "./dataflair/flair_1_toy_aerial_test/"  #e.g., ./flair_1_aerial_test/ or flair_1_toy_aerial_test/
   
-  path_labels_train: "./dataflair/flair_1_toy_labels_train"  #e.g., ./flair_labels_train or flair_1_toy_labels_train/
-  path_labels_test:  "./dataflair/flair_1_toy_labels_test" #e.g.,  ./flair_1_labels_test or flair_1_toy_labels_test/
+  path_labels_train: "./dataflair/flair_1_toy_labels_train/"  #e.g., ./flair_labels_train or flair_1_toy_labels_train/
+  path_labels_test:  "./dataflair/flair_1_toy_labels_test/" #e.g.,  ./flair_1_labels_test or flair_1_toy_labels_test/
 
   path_metadata_aerial: "./flair-1_metadata_aerial.json"
   
 outputs:
 
-  out_folder: "" 
+  out_folder: ".results/" 
   out_model_name: ""
 
 

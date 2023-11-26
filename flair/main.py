@@ -14,7 +14,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
-from pytorch_lightning.callbacks.progress.tqdm_progress import TQDMProgressBar
+from pytorch_lightning.callbacks import ProgressBar
 from pytorch_lightning import Trainer, seed_everything 
 
 import albumentations as A
@@ -110,7 +110,7 @@ def train_model(config, data_module, seg_module):
         mode = "min",
     )
 
-    prog_rate = TQDMProgressBar(refresh_rate=config["progress_rate"])
+    prog_rate = ProgressBar(refresh_rate=config["progress_rate"])
 
     callbacks = [
         ckpt_callback, 
