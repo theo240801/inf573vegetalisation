@@ -59,13 +59,15 @@ def read_image(path):
     
 def imshow(image, cmap=None, vmin=None, vmax=None):
     """Display an image whether its number of channels is 1, 3 or 5"""
+    fig, ax = plt.subplots()
     if cmap is None:
         cmap = 'viridis'
     if vmin is None:    
         vmin = np.min(image)
     if vmax is None:
         vmax = np.max(image)
-    if np.transpose(image).shape[0] == 5:
-        return plt.imshow(image[:,:,0:3], cmap=cmap, vmin=vmin, vmax=vmax)
-    else :
-        return plt.imshow(image, cmap=cmap, vmin=vmin, vmax=vmax)
+    if image.shape[-1] == 5:
+        ax.imshow(image[..., :3], cmap=cmap, vmin=vmin, vmax=vmax)
+    else:
+        ax.imshow(image, cmap=cmap, vmin=vmin, vmax=vmax)
+    plt.show()
