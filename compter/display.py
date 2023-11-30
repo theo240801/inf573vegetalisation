@@ -2,8 +2,9 @@ import matplotlib.pyplot as plt
 import random   
 import numpy as np
 import rasterio
+import cv2
 
-from processing import NDVI, RGB, elevation, IR
+from processing import NDVI, RGB, elevation, IR, extract_connected_components
 
 def imshow(image, cmap=None, vmin=None, vmax=None, title=None):
     """Display an image whether its number of channels is 1, 3 or 5"""
@@ -87,3 +88,28 @@ def display_samples(images,nb_samples: list) -> None:
             ax5.set_title('Blue', size=16,fontweight="bold",c='w')
     for i in indices:
         print(images[i])
+
+def display_colorized_connected_components(img):
+    """
+    Displays the connected components of a binary image in random colors.
+    """
+    img_binary = np.uint8(img)
+    nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(img_binary, connectivity=8)
+    # Generate random colors for each component
+    colors = [np.random.randint(0, 255, 3) for _ in range(nb_components)]
+    # Initialize the resulting colorized image
+    colorized_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
+    # Assign a unique color for each component and fill the colorized image
+    for i in range(1, nb_components):
+        colorized_img[output == i] = colors[i - 1]
+    imshow(cv2.cvtColor(colorized_img, cv2.COLOR_BGR2RGB))
+        
+def display_result(image, fonction):
+    """
+    Displays the result of the function that highlights the center of each tree
+    """
+    fig, ax = plt.subplots(figsize=(10, 10))
+    ax.imshow(image[:,:,:3])
+    ax.imshow(fonction(image), alpha=0.5)
+    plt.axis('off')
+    plt.show()
