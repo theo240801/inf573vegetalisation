@@ -103,13 +103,31 @@ def display_colorized_connected_components(img):
     for i in range(1, nb_components):
         colorized_img[output == i] = colors[i - 1]
     imshow(cv2.cvtColor(colorized_img, cv2.COLOR_BGR2RGB))
+    print('Number of connected components: {}'.format(nb_components))
+
+def display_colorized_connected_components_with_size_filtering(img, min_size=50):
+    img_binary = np.uint8(img)
+    connected_components_img,nb_components, output = extract_connected_components(img_binary, min_size=min_size)
+    # Generate random colors for each component
+    colors = [np.random.randint(0, 255, 3) for _ in range(nb_components)]
+    # Initialize the resulting colorized image
+    colorized_img = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
+    # Assign a unique color for each component and fill the colorized image
+    for i in range(1, nb_components):
+        colorized_img[output == i] = colors[i - 1]
+    imshow(cv2.cvtColor(colorized_img, cv2.COLOR_BGR2RGB))
+    print('Number of connected components: {}'.format(nb_components))
+
         
-def display_result(image, fonction):
+def display_result(image, coords_of_maximums, square_size=3):
     """
     Displays the result of the function that highlights the center of each tree
     """
-    fig, ax = plt.subplots(figsize=(10, 10))
-    ax.imshow(image[:,:,:3])
-    ax.imshow(fonction(image), alpha=0.5)
-    plt.axis('off')
-    plt.show()
+    image2 = image.copy()
+    for coord in coords_of_maximums:
+        for i in range(coord[0] - square_size, coord[0] + square_size + 1):
+            for j in range(coord[1] - square_size, coord[1] + square_size + 1):
+                if i >= 0 and i < image.shape[0] and j >= 0 and j < image.shape[1]:
+                    image2[i, j, :][:3] = [255, 0, 0]  # Set pixel color to red
+
+    imshow(image2)

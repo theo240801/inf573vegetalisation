@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+from scipy.ndimage import maximum_filter
 
 def elevation(image):
     """
@@ -35,7 +36,6 @@ def NDVI(image):
     return NDVI
 
 
-
 def binary_threshold(image, threshold_min=0, threshold_max=1e7):
     """
     Returns the image with the pixels below the threshold set to 0.
@@ -56,38 +56,77 @@ def binary_map(image, minNDVI=0.2, maxElev=20):
     binary[elev > maxElev] = 0
     return binary
 
+def indice(liste, element):
+    for i in range(len(liste)):
+        if liste[i] == element:
+            return i
+    return -1
 
-def extract_connected_components(image, min_size):
+def new_output(true_outputs, output):
+    new_outputs =  []
+    for i in range(1,len(true_outputs)+1):
+        new_outputs.append(i)
+    new_output = new_outputs[indice(true_outputs,output)]
+    
+
+def extract_connected_components(image, min_size=50):
     """
     Extracts the connected components of a binary image.
+    image : binary image
+    min_size : minimum size of the connected components to keep
     """
-    image_reformated = np.uint8(image)
+    binary = np.uint8(image.copy())
     # Find connected components
-    nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(image_reformated, connectivity=8)
+    nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity=8)
     # Extract sizes and update the number of components
     sizes = stats[1:, -1]
     nb_components -= 1
     # Initialize the answer image
-    connected_components_img = np.zeros_like(image_reformated)
+    connected_components_img = np.zeros_like(binary)
     # Keep components above the minimum size
+    true_component=[]
+    true_outputs=[]
+    real_nb_components = 0
     for i in range(nb_components):
         if sizes[i] >= min_size:
             connected_components_img[output == i + 1] = 255
+            real_nb_components += 1
+            true_component.append(True)
+        else:  
+            true_component.append(False)
     
-    return connected_components_img, nb_components, output
+    for i in range(output.shape[0]):
+        for j in range(output.shape[1]):
+            if not(true_component[output[i,j]-1]):
+                output[i,j]=0
+            else : 
+                if output[i,j] not in true_outputs:
+                    true_outputs.append(output[i,j])
+    
+    possible_new_outputs =  []
+    for i in range(1,len(true_outputs)+1):
+        possible_new_outputs.append(i)
+    
+    new_outputs = np.zeros_like(output)
+    for i in range(new_outputs.shape[0]):
+        for j in range(new_outputs.shape[1]):
+            new_outputs[i,j] = possible_new_outputs[indice(true_outputs,output[i,j])]
+    
+    return connected_components_img, real_nb_components, new_outputs
 
 
-def highlight_max_ndvi_component(image, square_size=3, min_size=50):
+def coords_max_ndvi_component(image, min_size=50):
     """
     Returns the image with the maximum NDVI value in each connected component colored.
+    image : 5 channel image
+    square_size : size of the square around the maximum value
+    min_size : minimum size of the connected components to keep
     """
     # Initialiser l'image résultante en noir et blanc (img_result)
     ndvi = NDVI(image)
-    img_filtered = extract_connected_components(binary_map(image), min_size=min_size)[0]
-    img_result = np.zeros_like(ndvi)
+    img_filtered, nb_components, output = extract_connected_components(binary_map(image), min_size=min_size)
     
-    nb_components, output, _, _ = cv2.connectedComponentsWithStats(img_filtered, connectivity=8)
-
+    coords = []
     # Parcourir chaque composant connecté
     for i in range(1, nb_components):
         # Initialiser une image pour le composant connecté courant
@@ -102,12 +141,32 @@ def highlight_max_ndvi_component(image, square_size=3, min_size=50):
         # Trouver les coordonnées (i, j) du pixel avec la valeur maximale dans le composant connecté
         max_ndvi_coord = np.unravel_index(np.argmax(img_result2), img_result2.shape)
 
-        # Mettre à jour l'image résultante avec la valeur maximale
-        img_result[max_ndvi_coord] = ndvi[max_ndvi_coord]
-        
-        # Afficher un carré autour des coordonnées de la valeur maximale
-        for i in range(max_ndvi_coord[0] - square_size, max_ndvi_coord[0] + square_size + 1):
-            for j in range(max_ndvi_coord[1] - square_size, max_ndvi_coord[1] + square_size + 1):
-                img_result[i, j] = ndvi[i, j]
+        coords.append(max_ndvi_coord)
 
-    return img_result
+    return coords
+
+def local_maximums(image, size=30):
+    # Apply maximum filter to find local maxima
+    local_maxima = maximum_filter(image, size) == image
+    coords_local_maximum=[]
+    local_maxima[image==0]=False
+    for i in range(local_maxima.shape[0]):
+        for j in range(local_maxima.shape[1]):
+            if local_maxima[i,j]:
+                coords_local_maximum.append((i,j))
+    return coords_local_maximum
+
+def local_maximums_of_ndvi_connexe_components(image,min_size=50, local_max_size=30):
+    ndvi = NDVI(image)
+    img_filtered, nb_components, output = extract_connected_components(binary_map(image), min_size=min_size)
+    coords = []
+    # Parcourir chaque composant connecté
+    for i in range(1, nb_components):
+        # Initialiser une image pour le composant connecté courant
+        img_result2 = np.zeros_like(ndvi)
+        # Créer un masque pour le composant connecté
+        component_mask = (output == i)
+        # Remplir l'image img_result2 avec les valeurs NDVI du composant connecté
+        img_result2[component_mask] = ndvi[component_mask]
+        coords += local_maximums(img_result2, size=local_max_size)
+    return coords
