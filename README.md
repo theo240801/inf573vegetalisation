@@ -20,3 +20,9 @@ après:
 - ?? patterns detection 
  -?? compter le nombre d'arbres 
 - ??classifier les différents types de végétations (utiliser le CNN fourni)
+
+
+## Idées d'amélioration
+Commencer à implémenter le CNN
+Objectif = ne pas compter l'herbe
++ pouvoir prendre en compte les arbres qui se font manger au threshold -> définir un threshold "par zone labellisée comme un arbre"

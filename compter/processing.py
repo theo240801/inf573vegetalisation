@@ -45,7 +45,7 @@ def binary_threshold(image, threshold_min=0, threshold_max=1e7):
     binary[image > threshold_max] = 0
     return binary
 
-def binary_map(image, minNDVI=0.2, maxElev=20):
+def binary_map(image, minNDVI=0, maxElev=70, minElev=10):
     """
     Applies the binary threshold about both the elevation and the NDVI on a given 5 channel image.
     """
@@ -54,6 +54,7 @@ def binary_map(image, minNDVI=0.2, maxElev=20):
     binary = np.zeros_like(ndvi)
     binary[ndvi > minNDVI] = 1
     binary[elev > maxElev] = 0
+    binary[elev < minElev] = 0
     return binary
 
 def indice(liste, element):
@@ -79,7 +80,7 @@ def extract_connected_components(image, min_size=50):
     # Find connected components
     nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity=8)
     # Extract sizes and update the number of components
-    sizes = stats[1:, -1]
+    sizes = stats[1:, cv2.CC_STAT_AREA]
     nb_components -= 1
     # Initialize the answer image
     connected_components_img = np.zeros_like(binary)
@@ -87,14 +88,14 @@ def extract_connected_components(image, min_size=50):
     true_component=[]
     true_outputs=[]
     real_nb_components = 0
-    for i in range(nb_components):
-        if sizes[i] >= min_size:
-            connected_components_img[output == i + 1] = 255
+    for i in range(1, nb_components+1):
+        if sizes[i-1] >= min_size:
+            connected_components_img[output == i] = 255
             real_nb_components += 1
             true_component.append(True)
         else:  
             true_component.append(False)
-    
+
     for i in range(output.shape[0]):
         for j in range(output.shape[1]):
             if not(true_component[output[i,j]-1]):
@@ -102,17 +103,19 @@ def extract_connected_components(image, min_size=50):
             else : 
                 if output[i,j] not in true_outputs:
                     true_outputs.append(output[i,j])
-    
+
     possible_new_outputs =  []
     for i in range(1,len(true_outputs)+1):
         possible_new_outputs.append(i)
-    
+
     new_outputs = np.zeros_like(output)
     for i in range(new_outputs.shape[0]):
         for j in range(new_outputs.shape[1]):
-            new_outputs[i,j] = possible_new_outputs[indice(true_outputs,output[i,j])]
+            if output[i,j]!=0:
+                new_outputs[i,j] = possible_new_outputs[indice(true_outputs,output[i,j])]
     
     return connected_components_img, real_nb_components, new_outputs
+
 
 
 def coords_max_ndvi_component(image, min_size=50):
@@ -128,7 +131,7 @@ def coords_max_ndvi_component(image, min_size=50):
     
     coords = []
     # Parcourir chaque composant connecté
-    for i in range(1, nb_components):
+    for i in range(1, nb_components+1):
         # Initialiser une image pour le composant connecté courant
         img_result2 = np.zeros_like(ndvi)
         
@@ -161,7 +164,7 @@ def local_maximums_of_ndvi_connexe_components(image,min_size=50, local_max_size=
     img_filtered, nb_components, output = extract_connected_components(binary_map(image), min_size=min_size)
     coords = []
     # Parcourir chaque composant connecté
-    for i in range(1, nb_components):
+    for i in range(1, nb_components+1):
         # Initialiser une image pour le composant connecté courant
         img_result2 = np.zeros_like(ndvi)
         # Créer un masque pour le composant connecté
@@ -170,3 +173,5 @@ def local_maximums_of_ndvi_connexe_components(image,min_size=50, local_max_size=
         img_result2[component_mask] = ndvi[component_mask]
         coords += local_maximums(img_result2, size=local_max_size)
     return coords
+
+

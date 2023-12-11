@@ -5,6 +5,7 @@ import rasterio
 import cv2
 
 from processing import NDVI, RGB, elevation, IR, extract_connected_components
+from data import read_tif_image
 
 def imshow(image, cmap=None, vmin=None, vmax=None, title=None):
     """Display an image whether its number of channels is 1, 3 or 5"""
@@ -131,3 +132,11 @@ def display_result(image, coords_of_maximums, square_size=3):
                     image2[i, j, :][:3] = [255, 0, 0]  # Set pixel color to red
 
     imshow(image2)
+
+
+
+def test_method(method, images_link):
+    for image_link in images_link:
+        image = read_tif_image(image_link)
+        coords_of_maximums = method(image)
+        display_result(image, coords_of_maximums)
