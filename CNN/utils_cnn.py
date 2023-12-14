@@ -82,6 +82,12 @@ new_lut_classes = {
 7  : 'other'}
 
 
+def get_data_paths (path, filter):
+    for path in Path(path).rglob(filter):
+         yield path.resolve().as_posix()
+
+
+
 def new_class(old_class_number: int, old_dict: dict = lut_classes, new_dict: dict = new_lut_classes):
     """
     Returns the new class for a given old class. 
@@ -206,6 +212,10 @@ def load_data(paths_data, val_percent=0.8, use_metadata=True):
             if data['IMG'][0][-10:-4] != data['MSK'][0][-10:-4] or data['IMG'][-1][-10:-4] != data['MSK'][-1][-10:-4]: 
                 print('[WARNING !!] UNSORTED IMAGES AND MASKS FOUND ! Please check load_data function for debugging.')                
 
+        data['IMG'] = data['IMG'][:500]
+        data['MSK'] = data['MSK'][:500]
+        data['MTD'] = data['MTD'][:500]
+
         return data
     
     
@@ -231,3 +241,32 @@ def step_loading(paths_data, use_metadata: bool) -> dict:
     print('+'+'-'*29+'+', '   LOADING DATA   ', '+'+'-'*29+'+')
     train, val, test = load_data(paths_data, use_metadata=use_metadata)
     return train, val, test  
+
+
+
+
+def display_predictions(images, predictions, nb_samples: int, palette=new_lut_colors, classes=new_lut_classes) -> None:
+    indices= random.sample(range(0, len(predictions)), nb_samples)
+    fig, axs = plt.subplots(nrows = nb_samples, ncols = 2, figsize = (17, nb_samples * 8)); fig.subplots_adjust(wspace=0.0, hspace=0.01)
+    fig.patch.set_facecolor('black')
+
+    for u, idx in enumerate(indices):
+        rgb_image = [i for i in images if predictions[idx].split('_')[-1][:-4] in i][0]
+        with rasterio.open(rgb_image, 'r') as f:
+            im = f.read([1,2,3]).swapaxes(0, 2).swapaxes(0, 1)
+        with rasterio.open(predictions[idx], 'r') as f:
+            mk = f.read([1])+1
+            f_classes = np.array(list(set(mk.flatten())))
+            mk = convert_to_color(mk[0], palette=palette)
+        axs = axs if isinstance(axs[u], np.ndarray) else [axs]
+        ax0 = axs[u][0] ; ax0.imshow(im);ax0.axis('off')
+        ax1 = axs[u][1] ; ax1.imshow(mk, interpolation='nearest', alpha=1); ax1.axis('off')
+        if u == 0:
+            ax0.set_title('RVB Image', size=16,fontweight="bold",c='w')
+            ax1.set_title('Prediction', size=16,fontweight="bold",c='w')
+        handles = []
+        for val in f_classes:
+            handles.append(mpatches.Patch(color=palette[val], label=classes[val]))
+        leg = ax1.legend(handles=handles, ncol=1, bbox_to_anchor=(1.4,1.01), fontsize=12, facecolor='k') 
+        for txt in leg.get_texts():
+          txt.set_color('w')

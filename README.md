@@ -18,7 +18,7 @@ Projet d'INF573 sur la détection et la classification de la végétalisation de
 après:
 - corréler cet indice à d'autres paramètres
 - ?? patterns detection 
- -?? compter le nombre d'arbres 
+ -?? count le nombre d'arbres 
 - ??classifier les différents types de végétations (utiliser le CNN fourni)
 
 

@@ -1,6 +1,8 @@
 flair/dataflair
 flair/TEST
-compter/__pycache__
+count/__pycache__
 flair/py_module/__pycache__
 flair/lightning_logs
 trees_cnn_model
+flairbigdataset
+lightning_logs
