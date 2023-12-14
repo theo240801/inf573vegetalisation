@@ -1,16 +1,132 @@
+## Imports
 import os
-import numpy as np
-from os.path import join
-from pathlib import Path
-import json
-import random
-from random import shuffle
 import re
-import yaml
+import random
+from pathlib import Path
+import numpy as np
+import matplotlib
+from matplotlib.colors import hex2color
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+import rasterio
+import rasterio.plot as plot
+import json
+from random import shuffle
 try:
-  from pytorch_lightning.utilities import rank_zero_only
+  from pytorch_lightning.utilities.distributed import rank_zero_only
 except ImportError:
   from pytorch_lightning.utilities.rank_zero import rank_zero_only  
+
+###OLD DICTS
+
+lut_colors = {
+1   : '#db0e9a',
+2   : '#938e7b',
+3   : '#f80c00',
+4   : '#a97101',
+5   : '#1553ae',
+6   : '#194a26',
+7   : '#46e483',
+8   : '#f3a60d',
+9   : '#660082',
+10  : '#55ff00',
+11  : '#fff30d',
+12  : '#e4df7c',
+13  : '#3de6eb',
+14  : '#ffffff',
+15  : '#8ab3a0',
+16  : '#6b714f',
+17  : '#c5dc42',
+18  : '#9999ff',
+19  : '#000000'}
+
+lut_classes = {
+1   : 'building',
+2   : 'pervious surface',
+3   : 'impervious surface',
+4   : 'bare soil',
+5   : 'water',
+6   : 'coniferous',
+7   : 'deciduous',
+8   : 'brushwood',
+9   : 'vineyard',
+10  : 'herbaceous vegetation',
+11  : 'agricultural land',
+12  : 'plowed land',
+13  : 'swimming_pool',
+14  : 'snow',
+15  : 'clear cut',
+16  : 'mixed',
+17  : 'ligneous',
+18  : 'greenhouse',
+19  : 'other'}
+
+### NEW DICTS
+
+new_lut_colors = {
+1   : '#194a26',
+2   : '#46e483',
+3   : '#f3a60d',
+4   : '#660082',
+5  : '#55ff00',
+6  : '#c5dc42',
+7  : '#000000'}
+
+new_lut_classes = {
+1   : 'coniferous',
+2   : 'deciduous',
+3   : 'brushwood',
+4   : 'vineyard',
+5  : 'herbaceous vegetation',
+6  : 'ligneous',
+7  : 'other'}
+
+
+def new_class(old_class_number: int, old_dict: dict = lut_classes, new_dict: dict = new_lut_classes):
+    """
+    Returns the new class for a given old class. 
+    """
+    old_class_name = old_dict.get(old_class_number)
+    if old_class_name is None or old_class_name not in new_dict.values():
+        return list(new_dict.keys())[list(new_dict.values()).index('other')]
+    new_class_number = list(new_dict.keys())[list(new_dict.values()).index(old_class_name)]
+    return new_class_number
+
+
+def transform_to_only_trees_mask(old_mask: np.ndarray, old_dict: dict= lut_classes, new_dict: dict= new_lut_classes):
+    """
+    Gives the only-tree mask from the old mask that comes from the flair dataset.
+    """
+    new_mask = np.vectorize(new_class)(old_mask, old_dict, new_dict)
+    return new_mask
+
+def convert_to_color(arr_2d: np.ndarray, palette: dict = new_lut_colors) -> np.ndarray:
+    rgb_palette = {k: tuple(int(i * 255) for i in hex2color(v)) for k, v in palette.items()}
+    arr_3d = np.zeros((arr_2d.shape[0], arr_2d.shape[1], 3), dtype=np.uint8)
+    for c, i in rgb_palette.items():
+        m = arr_2d == c
+        arr_3d[m] = i
+    return arr_3d
+
+def display_samples(images, masks, nb_samples: list, palette=new_lut_colors) -> None:
+    indices= random.sample(range(0, len(images)), nb_samples)
+    fig, axs = plt.subplots(nrows = nb_samples, ncols = 3, figsize = (20, nb_samples * 6)); fig.subplots_adjust(wspace=0.0, hspace=0.01)
+    fig.patch.set_facecolor('black')
+    for u, idx in enumerate(indices):
+        with rasterio.open(images[idx], 'r') as f:
+            im = f.read([1,2,3]).swapaxes(0, 2).swapaxes(0, 1)
+        with rasterio.open(masks[idx], 'r') as f:
+            mk = f.read([1])
+            mk = convert_to_color(transform_to_only_trees_mask(mk[0]), palette=palette)
+        axs = axs if isinstance(axs[u], np.ndarray) else [axs]
+        ax0 = axs[u][0] ; ax0.imshow(im);ax0.axis('off')
+        ax1 = axs[u][1] ; ax1.imshow(mk, interpolation='nearest') ;ax1.axis('off')
+        ax2 = axs[u][2] ; ax2.imshow(im); ax2.imshow(mk, interpolation='nearest', alpha=0.25); ax2.axis('off')
+        if u == 0:
+            ax0.set_title('RVB Image', size=16,fontweight="bold",c='w')
+            ax1.set_title('Ground Truth Mask', size=16,fontweight="bold",c='w')
+            ax2.set_title('Overlay Image & Mask', size=16,fontweight="bold",c='w')    
+
 
 def load_data(paths_data, val_percent=0.8, use_metadata=True):
     
@@ -109,39 +225,9 @@ def load_data(paths_data, val_percent=0.8, use_metadata=True):
     
     return dict_train, dict_val, dict_test
 
-def read_config(file_path):
-    with open(file_path, "r") as f:
-        return yaml.safe_load(f)
-    
+
 @rank_zero_only
 def step_loading(paths_data, use_metadata: bool) -> dict:
     print('+'+'-'*29+'+', '   LOADING DATA   ', '+'+'-'*29+'+')
     train, val, test = load_data(paths_data, use_metadata=use_metadata)
-    return train, val, test    
-   
-@rank_zero_only
-def print_recap(config, dict_train, dict_val, dict_test):
-    print('\n+'+'='*80+'+', 'Model name: ' + config['outputs']["out_model_name"], '+'+'='*80+'+', f"{'[---TASKING---]'}", sep='\n')
-    for info, val in zip(["use weights", "use metadata", "use augmentation"], [config["use_weights"], config["use_metadata"], config["use_augmentation"]]): 
-        print(f"- {info:25s}: {'':3s}{val}")
-    print('\n+'+'-'*80+'+', f"{'[---DATA SPLIT---]'}", sep='\n')
-    for split_name, d in zip(["train", "val", "test"], [dict_train, dict_val, dict_test]): 
-        print(f"- {split_name:25s}: {'':3s}{len(d['IMG'])} samples")
-    print('\n+'+'-'*80+'+', f"{'[---HYPER-PARAMETERS---]'}", sep='\n')
-    for info, val in zip(["batch size", "learning rate", "epochs", "nodes", "GPU per nodes", "accelerator", "workers"], [config["batch_size"], config["learning_rate"], config["num_epochs"], config["num_nodes"], config["gpus_per_node"], config["accelerator"], config["num_workers"]]): 
-        print(f"- {info:25s}: {'':3s}{val}")        
-    print('\n+'+'-'*80+'+', '\n')
-
-@rank_zero_only
-def print_metrics(miou, ious):
-    classes = ['building','pervious surface','impervious surface','bare soil','water','coniferous','deciduous',
-               'brushwood','vineyard','herbaceous vegetation','agricultural land','plowed land']
-    print('\n')
-    print('-'*40)
-    print(' '*8, 'Model mIoU : ', round(miou, 4))
-    print('-'*40)
-    print ("{:<25} {:<15}".format('Class','iou'))
-    print('-'*40)
-    for k, v in zip(classes, ious):
-        print ("{:<25} {:<15}".format(k, v))
-    print('\n\n')
+    return train, val, test  
