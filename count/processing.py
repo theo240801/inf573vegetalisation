@@ -4,6 +4,8 @@ import cv2
 from scipy.ndimage import maximum_filter
 from scipy import stats
 from scipy.ndimage.morphology import binary_dilation
+import count.display
+from PIL import Image
 
 
 
@@ -152,6 +154,10 @@ def coords_max_ndvi_component(image, min_size=50):
 
     return coords
 
+
+
+image = np.zeros((100, 100))
+
 def local_maximums(image, size=30):
     # Apply maximum filter to find local maxima
     local_maxima = maximum_filter(image, size) == image
@@ -187,3 +193,213 @@ def binary_masks_from_mask(msk, smoothing=15):
     return binary_masks
 
 
+
+
+
+#------------------------------------------------------------      
+def local_maximums_of_ndvi_connexe_components(image,min_size=50, local_max_size=30, original_image=image):
+    print("start")
+    ndvi = NDVI(image)
+    print("ndvi done")
+    img_filtered, nb_components, output = extract_connected_components(binary_map(image), min_size=min_size)
+    coords = []
+    # Parcourir chaque composant connecté
+    for i in range(1, nb_components):
+        print(i)
+        # Initialiser une image pour le composant connecté courant
+        img_result2 = np.zeros_like(ndvi)
+        # Créer un masque pour le composant connecté
+        component_mask = (output == i)
+        # Remplir l'image img_result2 avec les valeurs NDVI du composant connecté
+        img_result2[component_mask] = ndvi[component_mask]
+        coords += local_maximums(img_result2, size=local_max_size, original_image = original_image)
+    return coords
+
+
+
+
+
+
+def local_maximums_clean(image, size=30, original_image=image):
+    kernel = np.ones((5, 5), np.uint8)
+    # image = np.flipud(image)
+    #image =  binary_dilation(image, structure=kernel)
+    maximum_filter_image = maximum_filter(image, size)
+    # Apply maximum filter to find local maxima
+    local_maxima = maximum_filter(image, size) == image
+    coords_local_maximum = []
+    local_maxima[image == 0] = False
+
+    # Extract coordinates of local maxima
+    for i in range(local_maxima.shape[0]):
+        for j in range(local_maxima.shape[1]):
+            if local_maxima[i, j]:
+                coords_local_maximum.append((i, j))
+
+    num_pixels_local_maxima = np.sum(local_maxima)
+    
+
+    kernel = np.ones((7, 7), np.uint8)
+
+    trees_locations = binary_dilation(local_maxima, structure=kernel)
+
+    # Trouver les contours des composants connectés
+    contours = find_contours(image, 0.1)
+
+    # Créer une copie de l'image originale pour superposer les points
+    image_with_points = original_image.copy()
+
+    # Superposer les points en rouge
+    square_size = 3
+    for coord in coords_local_maximum:
+        for i in range(coord[0] - square_size, coord[0] + square_size + 1):
+            for j in range(coord[1] - square_size, coord[1] + square_size + 1):
+                if i >= 0 and i < image.shape[0] and j >= 0 and j < image.shape[1]:
+                    image_with_points[i, j] = [255, 0, 0]  # Set pixel color to red
+                    True
+    
+
+   
+
+    # Récupérer les coordonnées x et y des points d'intérêt
+    x_coords = [coord[1] for coord in coords_local_maximum]
+    y_coords = [coord[0] for coord in coords_local_maximum]
+
+
+    return coords_local_maximum
+
+
+
+#------------------------------------------------------------
+def extract_connected_components_clean(image, minimum_CC_size=50):
+    """
+    Extracts the connected components of a binary image.
+    image : binary image
+    min_size : minimum size of the connected components to keep
+    """
+    binary = np.uint8(image.copy())
+    # Find connected components
+    nb_components, output, stats, centroids = cv2.connectedComponentsWithStats(binary, connectivity=8)
+    # Extract sizes and update the number of components
+    sizes = stats[1:, -1]
+    nb_components -= 1
+    # Initialize the answer image
+    connected_components_img = np.zeros_like(binary)
+    # Keep components above the minimum size
+    true_component=[]
+    true_outputs=[]
+    real_nb_components = 0
+    for i in range(nb_components):
+        if sizes[i] >= minimum_CC_size:
+            connected_components_img[output == i + 1] = 255
+            real_nb_components += 1
+            true_component.append(True)
+        else:  
+            true_component.append(False)
+
+          
+    for i in range(output.shape[0]):
+        for j in range(output.shape[1]):
+            if not(true_component[output[i,j]-1]):
+                output[i,j]=0
+            else : 
+                if output[i,j] not in true_outputs:
+                    true_outputs.append(output[i,j])
+    
+    possible_new_outputs =  []
+    for i in range(1,len(true_outputs)+1):
+        possible_new_outputs.append(i)
+    
+    new_outputs = np.zeros_like(output)
+    for i in range(new_outputs.shape[0]):
+        for j in range(new_outputs.shape[1]):
+            new_outputs[i,j] = possible_new_outputs[indice(true_outputs,output[i,j])]
+            
+    
+    return connected_components_img, real_nb_components, new_outputs
+
+
+
+
+
+def binary_map_clean(image, ndvi_treshold, elevation_threshold_min, elevation_threshold_max):
+    """
+    Applies the binary threshold about both the elevation and the NDVI on a given 5 channel image.
+    """
+    ndvi = NDVI(image)
+    elev = elevation(image)
+    binary = np.zeros_like(ndvi)
+    binary[ndvi > ndvi_treshold] = 1
+    
+    binary[elev > elevation_threshold_max] = 0
+    binary[elev < elevation_threshold_min] = 0
+
+    return binary
+
+
+
+
+
+
+
+def local_maximums_clean(image, maximum_filter_size=30):
+    kernel = np.ones((5, 5), np.uint8)
+    # image = np.flipud(image)
+    #image =  binary_dilation(image, structure=kernel)
+    # maximum_filter_image = maximum_filter(image, maximum_filter_size)
+    # Apply maximum filter to find local maxima
+    local_maxima = maximum_filter(image, maximum_filter_size) == image
+    coords_local_maximum = []
+    local_maxima[image == 0] = False
+
+    # Extract coordinates of local maxima
+    for i in range(local_maxima.shape[0]):
+        for j in range(local_maxima.shape[1]):
+            if local_maxima[i, j]:
+                coords_local_maximum.append((i, j))  
+
+    return coords_local_maximum
+
+
+
+
+
+
+def local_maximums_of_ndvi_connexe_components_clean(image, ndvi_treshold, elevation_threshold_min, elevation_threshold_max, maximum_filter_size, minimum_CC_size):
+    ndvi = NDVI(image)
+    # img_filtered, nb_components, output = extract_connected_components_clean(binary_map_clean(image, ndvi_treshold, elevation_threshold_min, elevation_threshold_max), minimum_CC_size=minimum_CC_size)
+    img_filtered, nb_components, output = extract_connected_components_clean(binary_map_clean(image, ndvi_treshold, elevation_threshold_min, elevation_threshold_max), minimum_CC_size= minimum_CC_size)
+    coords = []
+    # Parcourir chaque composant connecté
+    for i in range(1, nb_components):
+        # Initialiser une image pour le composant connecté courant
+        img_result2 = np.zeros_like(ndvi)
+        # Créer un masque pour le composant connecté
+        component_mask = (output == i)
+        # Remplir l'image img_result2 avec les valeurs NDVI du composant connecté
+        img_result2[component_mask] = ndvi[component_mask]
+        coords += local_maximums_clean(img_result2, maximum_filter_size=maximum_filter_size)
+    return coords
+
+
+def show_trees(tif_image, ndvi_treshold=0, elevation_threshold_min=0, elevation_threshold_max=80, maximum_filter_size=15, minimum_CC_size=150, square_size=3, output_name="output_image"):
+    coords_of_maximums=local_maximums_of_ndvi_connexe_components_clean(tif_image, ndvi_treshold = ndvi_treshold, elevation_threshold_min = elevation_threshold_min, elevation_threshold_max=elevation_threshold_max, maximum_filter_size=maximum_filter_size, minimum_CC_size=minimum_CC_size)
+    image_rgb = RGB(tif_image)
+    image_with_trees = image_rgb.copy()
+    for coord in coords_of_maximums:
+        for i in range(coord[0] - square_size, coord[0] + square_size + 1):
+            for j in range(coord[1] - square_size, coord[1] + square_size + 1):
+                if i >= 0 and i < image_rgb.shape[0] and j >= 0 and j < image_rgb.shape[1]:
+                    image_with_trees[i, j, :][:3] = [255, 0, 0]  # Set pixel color to red
+    
+    count.display.imshow(image_with_trees)
+    
+
+    output_path = "output/" + output_name + ".jpg"
+    # cv2.imwrite(output_path, (RGB(image_with_trees)).astype(np.uint8))
+
+
+    image_to_save = Image.fromarray(RGB(image_with_trees))
+
+    image_to_save.save(output_path)
+    print("Image saved in " + output_path)
