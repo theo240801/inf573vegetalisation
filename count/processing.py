@@ -4,9 +4,8 @@ import cv2
 from scipy.ndimage import maximum_filter
 from scipy import stats
 from scipy.ndimage.morphology import binary_dilation
-import count.display
 from PIL import Image
-
+from CNN.utils_cnn import transform_to_only_trees_mask
 
 
 def elevation(image):
@@ -243,8 +242,6 @@ def local_maximums_clean(image, size=30, original_image=image):
 
     trees_locations = binary_dilation(local_maxima, structure=kernel)
 
-    # Trouver les contours des composants connectés
-    contours = find_contours(image, 0.1)
 
     # Créer une copie de l'image originale pour superposer les points
     image_with_points = original_image.copy()
@@ -296,24 +293,28 @@ def extract_connected_components_clean(image, minimum_CC_size=50):
             true_component.append(True)
         else:  
             true_component.append(False)
-
-          
-    for i in range(output.shape[0]):
-        for j in range(output.shape[1]):
-            if not(true_component[output[i,j]-1]):
-                output[i,j]=0
-            else : 
-                if output[i,j] not in true_outputs:
-                    true_outputs.append(output[i,j])
+    if nb_components>0:      
+        for i in range(output.shape[0]):
+            for j in range(output.shape[1]):
+                if not(true_component[output[i,j]-1]):
+                    output[i,j]=0
+                else : 
+                    if output[i,j] not in true_outputs:
+                        true_outputs.append(output[i,j])
     
     possible_new_outputs =  []
     for i in range(1,len(true_outputs)+1):
         possible_new_outputs.append(i)
     
     new_outputs = np.zeros_like(output)
-    for i in range(new_outputs.shape[0]):
-        for j in range(new_outputs.shape[1]):
-            new_outputs[i,j] = possible_new_outputs[indice(true_outputs,output[i,j])]
+    if len(possible_new_outputs) > 0:
+        # print("new outputs shape : ", new_outputs.shape)
+        for i in range(new_outputs.shape[0]):
+            for j in range(new_outputs.shape[1]):
+                # print("i : ", i, " j : ", j)
+                # print("indice : ", indice(true_outputs,output[i,j]))
+                # print("len possible new outputs : ", len(possible_new_outputs))
+                new_outputs[i,j] = possible_new_outputs[indice(true_outputs,output[i,j])]
             
     
     return connected_components_img, real_nb_components, new_outputs
@@ -381,18 +382,35 @@ def local_maximums_of_ndvi_connexe_components_clean(image, ndvi_treshold, elevat
         coords += local_maximums_clean(img_result2, maximum_filter_size=maximum_filter_size)
     return coords
 
+def imshow(image, cmap=None, vmin=None, vmax=None, title=None):
+    """Display an image whether its number of channels is 1, 3 or 5"""
+    fig, ax = plt.subplots()
+    ax.set_title(title)
+    if cmap is None:
+        cmap = 'viridis'
+    if vmin is None:    
+        vmin = np.min(image)
+    if vmax is None:
+        vmax = np.max(image)
+    if image.shape[-1] == 5:
+        ax.imshow(image[..., :3], cmap=cmap, vmin=vmin, vmax=vmax)
+
+    else:
+        ax.imshow(image, cmap=cmap, vmin=vmin, vmax=vmax)
+    plt.show()
+
 
 def show_trees(tif_image, ndvi_treshold=0, elevation_threshold_min=0, elevation_threshold_max=80, maximum_filter_size=15, minimum_CC_size=150, square_size=3, output_name="output_image"):
     coords_of_maximums=local_maximums_of_ndvi_connexe_components_clean(tif_image, ndvi_treshold = ndvi_treshold, elevation_threshold_min = elevation_threshold_min, elevation_threshold_max=elevation_threshold_max, maximum_filter_size=maximum_filter_size, minimum_CC_size=minimum_CC_size)
     image_rgb = RGB(tif_image)
-    image_with_trees = image_rgb.copy()
+    image_with_trees = tif_image.copy()
     for coord in coords_of_maximums:
         for i in range(coord[0] - square_size, coord[0] + square_size + 1):
             for j in range(coord[1] - square_size, coord[1] + square_size + 1):
                 if i >= 0 and i < image_rgb.shape[0] and j >= 0 and j < image_rgb.shape[1]:
                     image_with_trees[i, j, :][:3] = [255, 0, 0]  # Set pixel color to red
     
-    count.display.imshow(image_with_trees)
+    imshow(image_with_trees)
     
 
     output_path = "output/" + output_name + ".jpg"
@@ -403,3 +421,81 @@ def show_trees(tif_image, ndvi_treshold=0, elevation_threshold_min=0, elevation_
 
     image_to_save.save(output_path)
     print("Image saved in " + output_path)
+
+    return (image_with_trees, coords_of_maximums)
+
+
+
+def show_trees2(tif_image, ndvi_treshold=0, elevation_threshold_min=0, elevation_threshold_max=80, maximum_filter_size=15, minimum_CC_size=150, square_size=3, output_name="output_image"):
+    coords_of_maximums=local_maximums_of_ndvi_connexe_components_clean(tif_image, ndvi_treshold = ndvi_treshold, elevation_threshold_min = elevation_threshold_min, elevation_threshold_max=elevation_threshold_max, maximum_filter_size=maximum_filter_size, minimum_CC_size=minimum_CC_size)
+    image_rgb = RGB(tif_image)
+    image_with_trees = tif_image.copy()
+    for coord in coords_of_maximums:
+        for i in range(coord[0] - square_size, coord[0] + square_size + 1):
+            for j in range(coord[1] - square_size, coord[1] + square_size + 1):
+                if i >= 0 and i < image_rgb.shape[0] and j >= 0 and j < image_rgb.shape[1]:
+                    image_with_trees[i, j, :][:3] = [255, 0, 0]  # Set pixel color to red
+
+    return (image_with_trees, coords_of_maximums)
+
+
+
+
+def isFarEnough(coords1, coords2, threshold):
+        return np.linalg.norm(np.array(coords1) - np.array(coords2)) > threshold
+
+
+def show_trees_from_mask(tif_image, old_mask, ndvi_treshold, elevation_threshold_min, elevation_threshold_max, maximum_filter_size, minimum_CC_size, output_name):
+    new_mask = transform_to_only_trees_mask(old_mask)
+    binary_masks = binary_masks_from_mask(new_mask, smoothing=5)
+
+    tab_coords_of_maximums = []
+    final_image_with_trees = np.copy(tif_image)
+    for binary_mask in binary_masks:
+        current_image = np.zeros_like(tif_image)  
+        current_image[binary_mask] = tif_image[binary_mask]
+
+        current_image_with_trees, current_coords_of_maximums = show_trees2(current_image, ndvi_treshold=ndvi_treshold , elevation_threshold_min=elevation_threshold_min, elevation_threshold_max=elevation_threshold_max, maximum_filter_size=maximum_filter_size, minimum_CC_size=minimum_CC_size, output_name = output_name)
+
+        tab_coords_of_maximums.append(current_coords_of_maximums)
+
+
+    valid_coords_of_maximums = []
+    tab_numero_of_the_class = []
+    for numero_of_the_class, coords_of_maximums in enumerate(tab_coords_of_maximums):
+        for coord in coords_of_maximums:
+            if(len(valid_coords_of_maximums)==0):
+                valid_coords_of_maximums.append(coord)
+                tab_numero_of_the_class.append(numero_of_the_class)
+
+            else:
+                for valid_coord in valid_coords_of_maximums:
+                    booleanFarEnough = True
+                    if(not isFarEnough(valid_coord, coord, 10)):
+                        booleanFarEnough = False
+                        break
+                if(booleanFarEnough):
+                    valid_coords_of_maximums.append(coord)
+                    tab_numero_of_the_class.append(numero_of_the_class)
+
+    colors = [
+        [255, 0, 0],
+        [0, 255, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [255, 0, 255],
+        [128, 128, 128]
+    ]
+
+
+    square_size=3       
+    final_image_with_trees = np.copy(tif_image)  
+    for numero_of_coord, coord in enumerate(valid_coords_of_maximums):
+            for i in range(coord[0] - square_size, coord[0] + square_size + 1):
+                for j in range(coord[1] - square_size, coord[1] + square_size + 1):
+                    if i >= 0 and i < tif_image.shape[0] and j >= 0 and j < tif_image.shape[1]:
+                        final_image_with_trees[i, j, :][:3] = colors[tab_numero_of_the_class[numero_of_coord]]  # Set pixel color to red
+
+
+    imshow(final_image_with_trees)
