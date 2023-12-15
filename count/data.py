@@ -32,4 +32,11 @@ def read_tif_mask(path):
     with rasterio.open(path, 'r') as f:
         mk = f.read([1])
     return mk[0]
+
+
+def read_tif_mask_prediction(path):
+    """Gets the numpy array of a TIF mask from its path"""
+    with rasterio.open(path, 'r') as f:
+        mk = f.read([1]) + 1
+    return mk[0]
     

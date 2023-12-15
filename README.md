@@ -1,28 +1,25 @@
 # inf573vegetalisation
-Projet d'INF573 sur la détection et la classification de la végétalisation des villes
+Hello,
+
+Before getting to the code we recommend that you read the paper first.
+Once it is done here is how to run the notebook.
+
+## Organisation
+In this notebook, there are mostly three things :
+- a python module that trains a Unet model
+- a python module that implements the two algorithms mentionned in the paper.
+- some data
+
+## What you can do
+the story.ipynb notebook is runnable for you, however, the train_cnn notebook won't be runnable without you downloading the big dataset that can be found here: https://ignf.github.io/FLAIR/ .
+However all the parameters are the one we used for the training, and the results are still shown in the train_cnn.ipynb file.
+We exported a few predictions, a few labels and a few images in the data_sample folder for you to try if you want.
+
+In summary, go to story.ipynb to see how our code works.
 
 ## Installation
-- Cloner le repo
-- Ajouter le fichier "images" de la clée USB fournie par le professeur et le renommer "data". Il doit contenir deux dossiers "rgb" et "ir'
-
-## Explication de l'arborescence du projet
-- "data" est le dossier qui contient les sous-dossier "rgb" et "ir" contenant eux-mêmes les images sur lesquelles nous faisons fonctionner le code. Il est dans le gitignore et doit donc être ajouté à la main.
-- "doc" contient la bibliographie du projet
-
-
-## Feuille de route
-- combiner les images sattelites 
-- trouver les composantes connexes des villes
-- une fois qu'on a la composante connexe, trouver un indice représentant la couverture végétale
-
-après:
-- corréler cet indice à d'autres paramètres
-- ?? patterns detection 
- -?? count le nombre d'arbres 
-- ??classifier les différents types de végétations (utiliser le CNN fourni)
-
-
-## Idées d'amélioration
-Commencer à implémenter le CNN
-Objectif = ne pas compter l'herbe
-+ pouvoir prendre en compte les arbres qui se font manger au threshold -> définir un threshold "par zone labellisée comme un arbre"
+We used poetry for creating the virtual environment associated with the project. Here is how to install it :
+```pip install poetry```
+then 
+```poetry install```
+which should create a virtual environment to run the notebook.

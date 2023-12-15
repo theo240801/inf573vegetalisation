@@ -7,6 +7,11 @@ from scipy.ndimage.morphology import binary_dilation
 from PIL import Image
 from CNN.utils_cnn import transform_to_only_trees_mask
 import matplotlib.patches as mpatches
+from skimage.measure import find_contours
+import cv2
+from skimage import io, color, filters, draw, measure
+
+
 
 
 def elevation(image):
@@ -191,6 +196,17 @@ def binary_masks_from_mask(msk, smoothing=15):
         dilated_mask = binary_dilation(mask, iterations=smoothing)  # Increase the iterations value for stronger dilation
         binary_masks.append(dilated_mask)
     return binary_masks
+
+def binary_masks_from_mask_train(msk, smoothing=15):
+    binary_masks = []
+    for i in range(0, 7):
+        mask = msk == i
+        dilated_mask = binary_dilation(mask, iterations=smoothing)  # Increase the iterations value for stronger dilation
+        binary_masks.append(dilated_mask)
+    return binary_masks
+
+
+
 
 
 
@@ -480,8 +496,8 @@ def show_trees_from_mask(tif_image, old_mask, ndvi_treshold, elevation_threshold
                     tab_numero_of_the_class.append(numero_of_the_class)
 
     colors = [
-        [255, 0, 0],
         [0, 255, 0],
+        [255, 0, 0],
         [0, 0, 255],
         [255, 255, 0],
         [0, 255, 255],
@@ -504,12 +520,319 @@ def show_trees_from_mask(tif_image, old_mask, ndvi_treshold, elevation_threshold
     #display the image with trees + legend
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5), gridspec_kw={'width_ratios': [4, 1]})
 
-    # ax1.set_title("Image")
 
-    ax1.imshow(final_image_with_trees[..., :3], cmap='viridis')  # Vous pouvez ajuster les paramètres ici
+    ax1.imshow(final_image_with_trees[..., :3], cmap='viridis') 
     ax1.axis('off')
 
-    # ax2.set_title("Legend")
+
+    class_names = ['coniferous', 'deciduous', 'brushwood', 'vineyard', 'herbaceous vegetation', 'ligneous', 'other']
+
+    for color, label in zip(colors, class_names):
+        color_normalized = np.array(color) / 255.0
+        ax2.scatter([], [], color=color_normalized, label=label, s=100)
+
+    ax2.axis('off')
+
+    ax2.legend(loc='center', bbox_to_anchor=(0, 0.5))
+    
+    plt.show()
+
+
+
+    output_path = "output/" + output_name + ".jpg"
+
+
+    image_to_save = Image.fromarray(RGB(final_image_with_trees))
+
+    image_to_save.save(output_path)
+
+
+
+
+
+# def show_trees_from_mask2(tif_image, old_mask, ndvi_treshold, elevation_threshold_min, elevation_threshold_max, maximum_filter_size, minimum_CC_size, output_name):
+#     new_mask = transform_to_only_trees_mask(old_mask)
+#     binary_masks = binary_masks_from_mask(new_mask, smoothing=1)
+
+#     tab_coords_of_maximums = []
+#     final_image_with_trees = np.copy(tif_image)
+#     for numero_of_the_class, binary_mask in enumerate(binary_masks):
+#         current_image = np.zeros_like(tif_image)  
+#         current_image[binary_mask] = tif_image[binary_mask]
+
+#         current_image_with_trees, current_coords_of_maximums = show_trees2(current_image, ndvi_treshold=ndvi_treshold[numero_of_the_class] , elevation_threshold_min=elevation_threshold_min[numero_of_the_class], elevation_threshold_max=elevation_threshold_max[numero_of_the_class], maximum_filter_size=maximum_filter_size[numero_of_the_class], minimum_CC_size=minimum_CC_size[numero_of_the_class], output_name = output_name)
+
+#         tab_coords_of_maximums.append(current_coords_of_maximums)
+
+
+#     valid_coords_of_maximums = []
+#     tab_numero_of_the_class = []
+#     for numero_of_the_class, coords_of_maximums in enumerate(tab_coords_of_maximums):
+#         for coord in coords_of_maximums:
+#             if(len(valid_coords_of_maximums)==0):
+#                 valid_coords_of_maximums.append(coord)
+#                 tab_numero_of_the_class.append(numero_of_the_class)
+
+#             else:
+#                 for valid_coord in valid_coords_of_maximums:
+#                     booleanFarEnough = True
+#                     if(not isFarEnough(valid_coord, coord, 10)):
+#                         booleanFarEnough = False
+#                         break
+#                 if(booleanFarEnough):
+#                     valid_coords_of_maximums.append(coord)
+#                     tab_numero_of_the_class.append(numero_of_the_class)
+
+#     colors = [
+#         [0, 255, 0],
+#         [255, 0, 0],
+#         [0, 0, 255],
+#         [255, 255, 0],
+#         [0, 255, 255],
+#         [255, 0, 255],
+#         [128, 128, 128]
+#     ]
+
+
+#     square_size=3       
+#     final_image_with_trees = np.copy(tif_image)  
+#     for numero_of_coord, coord in enumerate(valid_coords_of_maximums):
+#         for i in range(coord[0] - square_size, coord[0] + square_size + 1):
+#             for j in range(coord[1] - square_size, coord[1] + square_size + 1):
+#                 if i >= 0 and i < tif_image.shape[0] and j >= 0 and j < tif_image.shape[1]:
+#                     final_image_with_trees[i, j, :][:3] = colors[tab_numero_of_the_class[numero_of_coord]]  # Set pixel color to red
+
+        
+
+
+
+#     plt.figure(figsize=(20, 5))   
+#     plt.imshow(final_image_with_trees[:,:,:3])
+#     plt.title('Image with Trees Points and Contours')
+#     for numero_of_the_class in range(len(binary_masks)):
+#         if(numero_of_the_class == 2):
+#             contours = find_contours(binary_masks[numero_of_the_class], 0.1)
+#             for contour in contours:
+#                 plt.plot(contour[:, 1], contour[:, 0], color=(0/255, 0/255, 255/255), linewidth=1)
+
+#         if(numero_of_the_class == 4):
+#             contours = find_contours(binary_masks[numero_of_the_class], 0.1)
+#             for contour in contours:
+#                 plt.plot(contour[:, 1], contour[:, 0], color=(0/255, 255/255, 0/255), linewidth=1)
+#     plt.show()
+
+
+
+
+
+
+
+#     plt.figure(figsize=(20, 5))
+#     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5), gridspec_kw={'width_ratios': [4, 1]})
+
+
+#     ax1.imshow(final_image_with_trees[..., :3], cmap='viridis') 
+#     ax1.axis('off')
+
+
+#     class_names = ['coniferous', 'deciduous', 'brushwood', 'vineyard', 'herbaceous vegetation', 'ligneous', 'other']
+
+#     for color, label in zip(colors, class_names):
+#         color_normalized = np.array(color) / 255.0
+#         ax2.scatter([], [], color=color_normalized, label=label, s=100)
+
+#     ax2.axis('off')
+
+#     ax2.legend(loc='center', bbox_to_anchor=(0, 0.5))
+    
+#     plt.show()
+
+
+
+
+
+
+def show_trees_from_mask2(tif_image, old_mask, ndvi_treshold, elevation_threshold_min, elevation_threshold_max, maximum_filter_size, minimum_CC_size, output_name):
+    new_mask = transform_to_only_trees_mask(old_mask)
+    binary_masks = binary_masks_from_mask(new_mask, smoothing=1)
+
+    tab_coords_of_maximums = []
+    final_image_with_trees = np.copy(tif_image)
+    for numero_of_the_class, binary_mask in enumerate(binary_masks):
+        current_image = np.zeros_like(tif_image)  
+        current_image[binary_mask] = tif_image[binary_mask]
+
+        current_image_with_trees, current_coords_of_maximums = show_trees2(current_image, ndvi_treshold=ndvi_treshold[numero_of_the_class] , elevation_threshold_min=elevation_threshold_min[numero_of_the_class], elevation_threshold_max=elevation_threshold_max[numero_of_the_class], maximum_filter_size=maximum_filter_size[numero_of_the_class], minimum_CC_size=minimum_CC_size[numero_of_the_class], output_name = output_name)
+
+        tab_coords_of_maximums.append(current_coords_of_maximums)
+
+
+    valid_coords_of_maximums = []
+    tab_numero_of_the_class = []
+    for numero_of_the_class, coords_of_maximums in enumerate(tab_coords_of_maximums):
+        for coord in coords_of_maximums:
+            if(len(valid_coords_of_maximums)==0):
+                valid_coords_of_maximums.append(coord)
+                tab_numero_of_the_class.append(numero_of_the_class)
+
+            else:
+                for valid_coord in valid_coords_of_maximums:
+                    booleanFarEnough = True
+                    if(not isFarEnough(valid_coord, coord, 10)):
+                        booleanFarEnough = False
+                        break
+                if(booleanFarEnough):
+                    valid_coords_of_maximums.append(coord)
+                    tab_numero_of_the_class.append(numero_of_the_class)
+
+    colors = [
+        [0, 255, 0],
+        [255, 0, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [255, 0, 255],
+        [128, 128, 128]
+    ]
+
+
+    square_size=3       
+    final_image_with_trees = np.copy(tif_image)  
+    for numero_of_coord, coord in enumerate(valid_coords_of_maximums):
+        for i in range(coord[0] - square_size, coord[0] + square_size + 1):
+            for j in range(coord[1] - square_size, coord[1] + square_size + 1):
+                if i >= 0 and i < tif_image.shape[0] and j >= 0 and j < tif_image.shape[1]:
+                    final_image_with_trees[i, j, :][:3] = colors[tab_numero_of_the_class[numero_of_coord]]  # Set pixel color to red
+
+        
+
+    plt.figure(figsize=(20, 5))   
+    plt.imshow(final_image_with_trees[:,:,:3])
+    plt.title('Image with Trees Points and Contours')
+    for numero_of_the_class in range(len(binary_masks)):
+        if(numero_of_the_class == 2):
+            contours = find_contours(binary_masks[numero_of_the_class], 0.1)
+            for contour in contours:
+                plt.plot(contour[:, 1], contour[:, 0], color=(0/255, 0/255, 255/255), linewidth=1)
+
+        if(numero_of_the_class == 4):
+            contours = find_contours(binary_masks[numero_of_the_class], 0.1)
+            for contour in contours:
+                plt.plot(contour[:, 1], contour[:, 0], color=(0/255, 255/255, 0/255), linewidth=1)
+    plt.show()
+
+
+
+
+
+
+
+    plt.figure(figsize=(20, 5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5), gridspec_kw={'width_ratios': [4, 1]})
+
+
+    ax1.imshow(final_image_with_trees[..., :3], cmap='viridis') 
+    ax1.axis('off')
+
+
+    class_names = ['coniferous', 'deciduous', 'brushwood', 'vineyard', 'herbaceous vegetation', 'ligneous', 'other']
+
+    for color, label in zip(colors, class_names):
+        color_normalized = np.array(color) / 255.0
+        ax2.scatter([], [], color=color_normalized, label=label, s=100)
+
+    ax2.axis('off')
+
+    ax2.legend(loc='center', bbox_to_anchor=(0, 0.5))
+    
+    plt.show()
+
+
+
+
+
+
+def show_trees_from_mask4(tif_image, old_mask, ndvi_treshold, elevation_threshold_min, elevation_threshold_max, maximum_filter_size, minimum_CC_size, output_name):
+    # new_mask = transform_to_only_trees_mask(old_mask)
+    new_mask = old_mask
+    binary_masks = binary_masks_from_mask_train(new_mask, smoothing=1)
+
+    tab_coords_of_maximums = []
+    final_image_with_trees = np.copy(tif_image)
+    for numero_of_the_class, binary_mask in enumerate(binary_masks):
+        current_image = np.zeros_like(tif_image)  
+        current_image[binary_mask] = tif_image[binary_mask]
+
+        current_image_with_trees, current_coords_of_maximums = show_trees2(current_image, ndvi_treshold=ndvi_treshold[numero_of_the_class] , elevation_threshold_min=elevation_threshold_min[numero_of_the_class], elevation_threshold_max=elevation_threshold_max[numero_of_the_class], maximum_filter_size=maximum_filter_size[numero_of_the_class], minimum_CC_size=minimum_CC_size[numero_of_the_class], output_name = output_name)
+
+        tab_coords_of_maximums.append(current_coords_of_maximums)
+
+
+    valid_coords_of_maximums = []
+    tab_numero_of_the_class = []
+    for numero_of_the_class, coords_of_maximums in enumerate(tab_coords_of_maximums):
+        for coord in coords_of_maximums:
+            if(len(valid_coords_of_maximums)==0):
+                valid_coords_of_maximums.append(coord)
+                tab_numero_of_the_class.append(numero_of_the_class)
+
+            else:
+                for valid_coord in valid_coords_of_maximums:
+                    booleanFarEnough = True
+                    if(not isFarEnough(valid_coord, coord, 10)):
+                        booleanFarEnough = False
+                        break
+                if(booleanFarEnough):
+                    valid_coords_of_maximums.append(coord)
+                    tab_numero_of_the_class.append(numero_of_the_class)
+
+    colors = [
+        [0, 255, 0],
+        [255, 0, 0],
+        [0, 0, 255],
+        [255, 255, 0],
+        [0, 255, 255],
+        [255, 0, 255],
+        [128, 128, 128]
+    ]
+
+
+    square_size=3       
+    final_image_with_trees = np.copy(tif_image)  
+    for numero_of_coord, coord in enumerate(valid_coords_of_maximums):
+        for i in range(coord[0] - square_size, coord[0] + square_size + 1):
+            for j in range(coord[1] - square_size, coord[1] + square_size + 1):
+                if i >= 0 and i < tif_image.shape[0] and j >= 0 and j < tif_image.shape[1]:
+                    final_image_with_trees[i, j, :][:3] = colors[tab_numero_of_the_class[numero_of_coord]]  # Set pixel color to red
+
+        
+
+    plt.figure(figsize=(20, 5))   
+    plt.imshow(final_image_with_trees[:,:,:3])
+    plt.title('Image with Trees Points and Contours')
+    for numero_of_the_class in range(len(binary_masks)):
+        if(numero_of_the_class == 2):
+            contours = find_contours(binary_masks[numero_of_the_class], 0.1)
+            for contour in contours:
+                plt.plot(contour[:, 1], contour[:, 0], color=(0/255, 0/255, 255/255), linewidth=1)
+
+        if(numero_of_the_class == 4):
+            contours = find_contours(binary_masks[numero_of_the_class], 0.1)
+            for contour in contours:
+                plt.plot(contour[:, 1], contour[:, 0], color=(0/255, 255/255, 0/255), linewidth=1)
+    plt.show()
+
+
+
+
+
+    plt.figure(figsize=(20, 5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5), gridspec_kw={'width_ratios': [4, 1]})
+
+
+    ax1.imshow(final_image_with_trees[..., :3], cmap='viridis') 
+    ax1.axis('off')
+
 
     class_names = ['coniferous', 'deciduous', 'brushwood', 'vineyard', 'herbaceous vegetation', 'ligneous', 'other']
 
