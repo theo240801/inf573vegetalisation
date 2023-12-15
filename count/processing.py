@@ -6,6 +6,7 @@ from scipy import stats
 from scipy.ndimage.morphology import binary_dilation
 from PIL import Image
 from CNN.utils_cnn import transform_to_only_trees_mask
+import matplotlib.patches as mpatches
 
 
 def elevation(image):
@@ -451,11 +452,11 @@ def show_trees_from_mask(tif_image, old_mask, ndvi_treshold, elevation_threshold
 
     tab_coords_of_maximums = []
     final_image_with_trees = np.copy(tif_image)
-    for binary_mask in binary_masks:
+    for numero_of_the_class, binary_mask in enumerate(binary_masks):
         current_image = np.zeros_like(tif_image)  
         current_image[binary_mask] = tif_image[binary_mask]
 
-        current_image_with_trees, current_coords_of_maximums = show_trees2(current_image, ndvi_treshold=ndvi_treshold , elevation_threshold_min=elevation_threshold_min, elevation_threshold_max=elevation_threshold_max, maximum_filter_size=maximum_filter_size, minimum_CC_size=minimum_CC_size, output_name = output_name)
+        current_image_with_trees, current_coords_of_maximums = show_trees2(current_image, ndvi_treshold=ndvi_treshold[numero_of_the_class] , elevation_threshold_min=elevation_threshold_min[numero_of_the_class], elevation_threshold_max=elevation_threshold_max[numero_of_the_class], maximum_filter_size=maximum_filter_size[numero_of_the_class], minimum_CC_size=minimum_CC_size[numero_of_the_class], output_name = output_name)
 
         tab_coords_of_maximums.append(current_coords_of_maximums)
 
@@ -498,4 +499,26 @@ def show_trees_from_mask(tif_image, old_mask, ndvi_treshold, elevation_threshold
                         final_image_with_trees[i, j, :][:3] = colors[tab_numero_of_the_class[numero_of_coord]]  # Set pixel color to red
 
 
-    imshow(final_image_with_trees)
+
+
+    #display the image with trees + legend
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5), gridspec_kw={'width_ratios': [4, 1]})
+
+    # ax1.set_title("Image")
+
+    ax1.imshow(final_image_with_trees[..., :3], cmap='viridis')  # Vous pouvez ajuster les paramètres ici
+    ax1.axis('off')
+
+    # ax2.set_title("Legend")
+
+    class_names = ['coniferous', 'deciduous', 'brushwood', 'vineyard', 'herbaceous vegetation', 'ligneous', 'other']
+
+    for color, label in zip(colors, class_names):
+        color_normalized = np.array(color) / 255.0
+        ax2.scatter([], [], color=color_normalized, label=label, s=100)
+
+    ax2.axis('off')
+
+    ax2.legend(loc='center', bbox_to_anchor=(0, 0.5))
+    
+    plt.show()
